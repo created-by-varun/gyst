@@ -1,182 +1,158 @@
 # Gyst - AI-Powered Git Commit Assistant
 
-Version: 0.1.0
-
-## Overview
-
 Gyst is a command-line tool that simplifies git commit workflows by using AI to analyze changes and generate meaningful commit messages. It helps developers maintain consistent commit history and save time while following best practices.
+
+## Features
+
+- **AI-Powered Commit Messages**: Automatically generate meaningful commit messages based on your changes
+- **Conventional Commit Format**: All messages follow the conventional commit format
+- **Multiple Suggestions**: Get multiple commit message options to choose from
+- **Quick Mode**: Fast commit workflow without confirmation prompts
+- **Interactive Editing**: Edit generated messages before committing
+- **Smart Diff Analysis**: Analyze staged changes for better context
 
 ## Installation
 
-```bash
-# Using cargo
-cargo install gyst
+### Using Cargo
 
-# From source
-git clone https://github.com/yourusername/gyst
+```bash
+cargo install gyst
+```
+
+### From Source
+
+```bash
+git clone https://github.com/created-by-varun/gyst
 cd gyst
 cargo install --path .
 ```
 
-## Core Features
+## Configuration
 
-### 1. Smart Commit Message Generation
-
-```bash
-gyst commit [--quick]
-```
-
-- Analyzes staged changes in git repository
-- Generates contextual commit messages using AI
-- Provides interactive mode for message selection/editing
-- Quick mode for faster workflows
-- Options:
-  - `--quick, -q`: Skip confirmation and use first suggestion
-  - `--edit, -e`: Open in editor for manual modifications
-
-### 2. Multiple Suggestions
+Before using Gyst, you'll need to set up your AI provider API key:
 
 ```bash
-gyst suggest [--count <number>]
+gyst config --api-key your-api-key-here
 ```
 
-- Generates multiple commit message alternatives
-- Allows selection from different options
-- Options:
-  - `--count, -c`: Number of suggestions (default: 3)
-  - `--format, -f`: Output format (default: interactive)
+The configuration is stored in `~/.gyst/config.toml`:
 
-### 3. Diff Analysis
+```toml
+[ai]
+provider = "anthropic"  # AI provider (currently supports Anthropic)
+api_key = "your-api-key"
+model = "claude-3-5-haiku-20241022"  # Model to use
+
+[git]
+max_diff_size = 1000  # Maximum diff size in lines
+
+[commit]
+max_subject_length = 72  # Maximum length of commit subject line
+```
+
+## Commands
+
+### Generate and Create Commit
 
 ```bash
-gyst diff
+gyst commit [options]
 ```
 
-- Shows detailed analysis of staged changes
-- Provides statistics about modifications
-- Categorizes changes by type:
-  - Added files
-  - Modified files
-  - Deleted files
-  - Renamed files
-- Statistics include:
-  - Number of files changed
-  - Lines added/removed
-  - File-specific changes
+Analyzes staged changes and generates a commit message using AI.
 
-### 4. Configuration Management
+**Options:**
+
+- `-q, --quick`: Skip confirmation and use the generated message directly
+- Default behavior: Shows the message and prompts for:
+  - `Y` (default): Accept and use the message
+  - `n`: Reject and abort commit
+  - `e`: Open in editor to modify message
+
+**Example:**
+
+```bash
+# Interactive mode
+gyst commit
+
+# Quick mode
+gyst commit -q
+```
+
+### Get Multiple Suggestions
+
+```bash
+gyst suggest [options]
+```
+
+Generates multiple commit message suggestions for you to choose from.
+
+**Options:**
+
+- `-c, --count <number>`: Number of suggestions to generate (default: 3)
+
+**Example:**
+
+```bash
+# Get default 3 suggestions
+gyst suggest
+
+# Get 5 suggestions
+gyst suggest -c 5
+```
+
+### Configure Settings
 
 ```bash
 gyst config [options]
 ```
 
-- Manages tool configuration and API settings
-- Options:
-  - `--api-key`: Set AI service API key
-  - `--show`: Display current configuration
-  - `--edit`: Open configuration in editor
-  - `--reset`: Reset to default settings
+Manage Gyst configuration settings.
 
-## Configuration
+**Options:**
 
-### Location
+- `--api-key <key>`: Set the AI service API key
+- `-s, --show`: Show current configuration (both forms work)
 
-- Global: `~/.gyst/config.toml`
-- Project-specific: `.gyst.toml` in project root
-
-### Configuration Options
-
-```toml
-[ai]
-provider = "openai"  # or "anthropic"
-api_key = "your-api-key"
-model = "gpt-4"      # or "claude-3"
-
-[git]
-max_diff_size = 1000 # lines
-protected_branches = ["main", "master"]
-
-[commit]
-template = "conventional"  # or "custom"
-max_subject_length = 72
-max_body_length = 500
-```
-
-## Advanced Features
-
-### 1. Conventional Commits Support
-
-- Automatically formats messages following conventional commits
-- Categories:
-  - feat: New features
-  - fix: Bug fixes
-  - docs: Documentation
-  - style: Formatting
-  - refactor: Code restructuring
-  - test: Testing
-  - chore: Maintenance
-
-### 2. Smart Analysis
-
-- Detects:
-  - Breaking changes
-  - API modifications
-  - Dependency updates
-  - Security-sensitive changes
-  - Configuration changes
-
-### 3. Integration Features
-
-- Git hooks compatibility
-- CI/CD pipeline integration
-- Project-specific configurations
-
-## Error Handling
-
-- Repository validation
-- API connectivity issues
-- Rate limiting
-- Invalid configurations
-- Git operation errors
-
-## Best Practices
-
-1. Stage changes before running commands
-2. Review suggested messages before accepting
-3. Use project-specific configurations for team consistency
-4. Keep API keys secure
-5. Regular updates for latest features
-
-## Command Examples
+**Example:**
 
 ```bash
-# Generate commit message
-gyst commit
+# Set API key
+gyst config --api-key your-api-key-here
 
-# Quick commit without confirmation
-gyst commit --quick
+# View current config (using short form)
+gyst config -s
 
-# Get 5 message suggestions
-gyst suggest --count 5
-
-# Analyze current changes
-gyst diff
-
-# Configure API key
-gyst config --api-key "your-key-here"
-
-# Show current configuration
+# View current config (using long form)
 gyst config --show
 ```
 
-## Development Status
+### View Diff
 
-- Current version: 0.1.0
-- Status: Alpha
-- Planned features:
-  - Custom templates
-  - Team collaboration features
-  - Multi-language support
-  - IDE integrations
+```bash
+gyst diff
+```
 
-Would you like me to expand on any particular section or add more details to specific features?
+Shows a detailed analysis of staged changes including:
+
+- Added files
+- Modified files
+- Deleted files
+- Renamed files
+- Change statistics
+
+## Best Practices
+
+1. **Stage Changes**: Always stage your changes using `git add` before using Gyst commands
+2. **Review Messages**: While quick mode is convenient, it's recommended to review the AI-generated messages
+3. **API Key**: Set up your API key using `gyst config --api-key` before using any AI features
+4. **Conventional Commits**: Gyst follows the conventional commit format:
+   - Format: `type(scope): description`
+   - Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+[MIT](LICENSE)
