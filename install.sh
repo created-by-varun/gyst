@@ -25,17 +25,10 @@ if [ "$OS" != "darwin" ]; then
     error "❌ This installer only supports macOS currently"
 fi
 
-case $ARCH in
-    x86_64)
-        ARCH="x86_64"
-        ;;
-    arm64|aarch64)
-        ARCH="aarch64"
-        ;;
-    *)
-        error "❌ Unsupported architecture: $ARCH"
-        ;;
-esac
+# Detect architecture
+if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86_64" ]; then
+    error "❌ Unsupported architecture $ARCH"
+fi
 
 # Set install location
 INSTALL_DIR="/usr/local/bin"
@@ -48,11 +41,41 @@ if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p "$INSTALL_DIR"
 fi
 
-# Download and install binary
+# Set binary name based on architecture
+BINARY="gyst-darwin-${ARCH}"
+
+# GitHub repository information
+REPO="created-by-varun/gyst"
+LATEST_RELEASE_TAG="v0.1.0"
+
+# Download URLs
+BINARY_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE_TAG/$BINARY"
+CHECKSUM_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE_TAG/$BINARY.sha256"
+
+# Create temporary directory
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+
 info "⚡ Downloading gyst..."
-RELEASE_URL="https://github.com/created-by-varun/gyst/releases/latest/download/gyst-$OS-$ARCH"
-sudo curl -#L "$RELEASE_URL" -o "$BINARY_PATH"
-sudo chmod +x "$BINARY_PATH"
+
+# Download binary and checksum
+curl -fsSL "$BINARY_URL" -o "$BINARY"
+curl -fsSL "$CHECKSUM_URL" -o "$BINARY.sha256"
+
+# Verify checksum
+info "🔒 Verifying checksum..."
+shasum -a 256 -c "$BINARY.sha256"
+
+# Make binary executable
+chmod +x "$BINARY"
+
+# Move binary to /usr/local/bin
+info "📦 Installing gyst..."
+sudo mv "$BINARY" "$BINARY_PATH"
+
+# Clean up
+cd - > /dev/null
+rm -rf "$TMP_DIR"
 
 # Verify installation
 if command -v gyst >/dev/null; then
