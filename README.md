@@ -13,12 +13,6 @@ Gyst is a command-line tool that simplifies git commit workflows by using AI to 
 
 ## Installation
 
-### Using Cargo
-
-```bash
-cargo install gyst
-```
-
 ### From Source
 
 ```bash
