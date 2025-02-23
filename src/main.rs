@@ -151,34 +151,68 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            // Load config and create AI client
             let config = config::Config::load()?;
             let generator = ai::CommitMessageGenerator::new(config);
 
             let mut sp = Spinner::new(Spinners::Dots12, "Generating commit message suggestions...".into());
             let suggestions = generator.generate_suggestions(&changes, &diff, 3).await?;
-            sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Suggestions generated!").green()));
+            sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Suggestions generated!").green(), SPARKLE));
 
-            println!("\n{} {}", SPARKLE, style("Suggested commit messages:").cyan().bold());
+            println!("\n{} {}", SPARKLE, style("Here are some commit message suggestions:").cyan().bold());
             for (i, message) in suggestions.iter().enumerate() {
-                println!("\n{}. {}", (i + 1).to_string().bold(), style(message).green());
+                println!("\n{} {}", 
+                    style(format!("{}.", i + 1)).cyan().bold(),
+                    style(message).green()
+                );
             }
 
-            print!("\n{} Select a message to use (1-3) or press Enter to skip: ", PENCIL);
+            print!("\n{} {} ", PENCIL, style("Select a message (1-3) or press Enter to skip:").cyan());
             io::stdout().flush()?;
 
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
-            
+
             if let Ok(choice) = input.trim().parse::<usize>() {
                 if choice > 0 && choice <= suggestions.len() {
                     let message = &suggestions[choice - 1];
                     let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                     repo.create_commit(message)?;
                     sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
+                    println!("\n{} {}\n{}\n", PENCIL, style("Final Commit Message:").cyan().bold(), message);
                 }
             } else {
                 println!("\n{} {}", CROSS, style("No message selected. You can still create a commit manually.").yellow());
+            }
+        }
+        Commands::Explain { description } => {
+            let mut sp = Spinner::new(Spinners::Dots12, "Analyzing your request...".into());
+            
+            let config = config::Config::load()?;
+            let suggester = command_suggest::CommandSuggester::new(config);
+            
+            match suggester.suggest(&description).await {
+                Ok(suggestion) => {
+                    sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Analysis complete!").green()));
+                    println!("\n{} {}", SPARKLE, style("Here's what you can do:").cyan().bold());
+                    
+                    // Split the suggestion into command and explanation if it contains a newline
+                    if let Some((command, explanation)) = suggestion.split_once('\n') {
+                        println!("\n{} {}", PENCIL, style("Command:").cyan());
+                        println!("{}", style(command.trim()).green().bold());
+                        
+                        println!("\n{} {}", PENCIL, style("Explanation:").cyan());
+                        println!("{}", style(explanation.trim()).white());
+                    } else {
+                        // If there's no newline, just print the whole suggestion
+                        println!("{}", style(suggestion).green());
+                    }
+                    
+                    println!("\n{} {}", SPARKLE, style("You can run this command directly or modify it as needed.").cyan());
+                }
+                Err(e) => {
+                    sp.stop_with_message(format!("{} {}\n", CROSS, style("Analysis failed").red()));
+                    println!("{} {}", CROSS, style(format!("Error: {}", e)).red());
+                }
             }
         }
         Commands::Config { api_key, show } => {
@@ -192,22 +226,6 @@ async fn main() -> anyhow::Result<()> {
 
             if show || api_key.is_none() {
                 println!("{}", config.display());
-            }
-        }
-        Commands::Explain { description } => {
-            println!("{} {}", PENCIL, style("Analyzing your request...").cyan().bold());
-            
-            let config = config::Config::load()?;
-            let suggester = command_suggest::CommandSuggester::new(config);
-            
-            match suggester.suggest(&description).await {
-                Ok(suggestion) => {
-                    println!("\n{} {}", SPARKLE, style("Here's what you can do:").cyan().bold());
-                    println!("{}", suggestion);
-                }
-                Err(e) => {
-                    println!("{} {}", CROSS, style(format!("Error getting suggestion: {}", e)).red());
-                }
             }
         }
         Commands::Diff => {
