@@ -185,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Explain { description } => {
-            let mut sp = Spinner::new(Spinners::Dots12, "Analyzing your request...".into());
+            let mut sp = Spinner::new(Spinners::Dots12, format!("{} {}", SPARKLE, style("Analyzing your request...").cyan().bold()).into());
             
             let config = config::Config::load()?;
             let suggester = command_suggest::CommandSuggester::new(config);
@@ -193,21 +193,50 @@ async fn main() -> anyhow::Result<()> {
             match suggester.suggest(&description).await {
                 Ok(suggestion) => {
                     sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Analysis complete!").green()));
-                    println!("\n{} {}", SPARKLE, style("Here's what you can do:").cyan().bold());
+
+                    // Parse the suggestion into sections
+                    let sections: Vec<&str> = suggestion.split("\nCOMMAND:").collect();
                     
-                    // Split the suggestion into command and explanation if it contains a newline
-                    if let Some((command, explanation)) = suggestion.split_once('\n') {
-                        println!("\n{} {}", PENCIL, style("Command:").cyan());
-                        println!("{}", style(command.trim()).green().bold());
-                        
-                        println!("\n{} {}", PENCIL, style("Explanation:").cyan());
-                        println!("{}", style(explanation.trim()).white());
+                    if sections.len() > 1 {
+                        // First section is the introduction
+                        if !sections[0].trim().is_empty() {
+                            println!("\n{}", style(sections[0].trim()).white());
+                        }
+
+                        // Process each command section
+                        for section in sections[1..].iter() {
+                            let parts: Vec<&str> = section.split("\nEXPLANATION:").collect();
+                            if parts.len() == 2 {
+                                // Command with special formatting
+                                println!("\n{} {}", PENCIL, style(parts[0].trim()).green().bold());
+
+                                // Split explanation and note if present
+                                let explanation_parts: Vec<&str> = parts[1].split("\nNOTE:").collect();
+                                println!("   {}", style(explanation_parts[0].trim()).white());
+
+                                // Print note if present, but only if it's important
+                                if explanation_parts.len() > 1 {
+                                    let note = explanation_parts[1].trim();
+                                    if note.contains("CAREFUL") || note.contains("WARNING") || 
+                                       note.contains("IMPORTANT") || note.contains("DO NOT") {
+                                        println!("   {} {}", CROSS, style(note).yellow());
+                                    }
+                                }
+                            }
+                        }
+
+                        // Print additional tip if present and important
+                        if let Some(tip_start) = suggestion.find("\nADDITIONAL TIP:") {
+                            let tip = suggestion[tip_start..].trim().replace("ADDITIONAL TIP:", "").trim().to_string();
+                            if tip.contains("CAREFUL") || tip.contains("WARNING") || 
+                               tip.contains("IMPORTANT") || tip.contains("caution") {
+                                println!("\n{} {}", SPARKLE, style(tip).yellow().italic());
+                            }
+                        }
                     } else {
-                        // If there's no newline, just print the whole suggestion
-                        println!("{}", style(suggestion).green());
+                        // Simple output for single-line suggestions
+                        println!("\n{} {}", PENCIL, style(suggestion).green());
                     }
-                    
-                    println!("\n{} {}", SPARKLE, style("You can run this command directly or modify it as needed.").cyan());
                 }
                 Err(e) => {
                     sp.stop_with_message(format!("{} {}\n", CROSS, style("Analysis failed").red()));
