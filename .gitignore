@@ -1,1 +1,4 @@
 /target
+
+# Release artifacts
+gyst-darwin-*
