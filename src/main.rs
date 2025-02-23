@@ -8,6 +8,13 @@ use clap::Parser;
 use cli::{Cli, Commands};
 use colored::*;
 use std::io::{self, Write};
+use spinners::{Spinner, Spinners};
+use console::{style, Emoji};
+
+static CHECKMARK: Emoji<'_, '_> = Emoji("✓", "√");
+static CROSS: Emoji<'_, '_> = Emoji("✗", "x");
+static SPARKLE: Emoji<'_, '_> = Emoji("✨", "*");
+static PENCIL: Emoji<'_, '_> = Emoji("✏️ ", ">");
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,18 +26,19 @@ async fn main() -> anyhow::Result<()> {
 
             // Check if there are any staged changes
             if !repo.has_staged_changes()? {
-                println!("\n{}", "No staged changes found.".yellow());
-                print!("Would you like to stage all changes? [y/N] ");
+                println!("\n{} {}", CROSS, style("No staged changes found.").yellow());
+                print!("\n{} Would you like to stage all changes? [y/N] ", PENCIL);
                 io::stdout().flush()?;
 
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 
                 if input.trim().to_lowercase() == "y" {
+                    let mut sp = Spinner::new(Spinners::Dots9, "Staging all changes...".into());
                     repo.stage_all()?;
-                    println!("All changes have been staged.");
+                    sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("All changes have been staged").green(), SPARKLE));
                 } else {
-                    println!("No changes to commit. Stage your changes using 'git add' first.");
+                    println!("\n{} {}", CROSS, style("No changes to commit. Stage your changes using 'git add' first.").yellow());
                     return Ok(());
                 }
             }
@@ -51,19 +59,21 @@ async fn main() -> anyhow::Result<()> {
             let config = config::Config::load()?;
             let generator = ai::CommitMessageGenerator::new(config);
 
-            println!("{}", "Generating commit message...".bold());
+            let mut sp = Spinner::new(Spinners::Dots12, "Analyzing changes and generating commit message...".into());
             let message = generator.generate_message(&changes, &diff).await?;
+            sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Commit message generated!").green()));
 
             if quick {
                 // Use the message directly in quick mode
+                let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                 repo.create_commit(&message)?;
-                println!("\n{}", "Commit created successfully!".green().bold());
-                println!("Message: {}", message);
+                sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
+                println!("\n{} {}\n{}\n", PENCIL, style("Commit Message:").cyan().bold(), message);
             } else {
                 // Show the message and ask for confirmation
-                println!("\nProposed commit message:");
-                println!("{}", message.green());
-                print!("\nUse this message? [Y/n/e(edit)] ");
+                println!("\n{} {}", SPARKLE, style("Proposed commit message:").cyan().bold());
+                println!("{}\n", style(message.as_str()).green());
+                print!("{} Use this message? [Y/n/e(edit)] ", PENCIL);
                 io::stdout().flush()?;
 
                 let mut input = String::new();
@@ -71,10 +81,11 @@ async fn main() -> anyhow::Result<()> {
                 
                 let message = match input.trim().to_lowercase().as_str() {
                     "n" | "no" => {
-                        println!("Commit aborted");
+                        println!("\n{} {}", CROSS, style("Commit aborted").yellow());
                         return Ok(());
                     }
                     "e" | "edit" => {
+                        println!("\n{} {}", PENCIL, style("Opening in editor...").cyan());
                         // Create a temporary file with the message
                         let mut temp = tempfile::NamedTempFile::new()?;
                         writeln!(temp, "{}", message)?;
@@ -88,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
                             .status()?;
                         
                         if !status.success() {
-                            println!("Editor returned with error");
+                            println!("{} {}", CROSS, style("Editor returned with error").red());
                             return Ok(());
                         }
                         
@@ -99,8 +110,11 @@ async fn main() -> anyhow::Result<()> {
                     _ => message,
                 };
 
+                // Create the commit
+                let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                 repo.create_commit(&message)?;
-                println!("\n{}", "Commit created successfully!".green().bold());
+                sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
+                println!("\n{} {}\n{}\n", PENCIL, style("Final Commit Message:").cyan().bold(), message);
             }
         }
         Commands::Suggest => {
@@ -108,18 +122,19 @@ async fn main() -> anyhow::Result<()> {
             
             // Check if there are any staged changes
             if !repo.has_staged_changes()? {
-                println!("\n{}", "No staged changes found.".yellow());
-                print!("Would you like to stage all changes? [y/N] ");
+                println!("\n{} {}", CROSS, style("No staged changes found.").yellow());
+                print!("\n{} Would you like to stage all changes? [y/N] ", PENCIL);
                 io::stdout().flush()?;
 
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 
                 if input.trim().to_lowercase() == "y" {
+                    let mut sp = Spinner::new(Spinners::Dots9, "Staging all changes...".into());
                     repo.stage_all()?;
-                    println!("All changes have been staged.");
+                    sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("All changes have been staged").green(), SPARKLE));
                 } else {
-                    println!("No changes to commit. Stage your changes using 'git add' first.");
+                    println!("\n{} {}", CROSS, style("No changes to commit. Stage your changes using 'git add' first.").yellow());
                     return Ok(());
                 }
             }
@@ -140,15 +155,16 @@ async fn main() -> anyhow::Result<()> {
             let config = config::Config::load()?;
             let generator = ai::CommitMessageGenerator::new(config);
 
-            println!("Generating commit message suggestions...");
+            let mut sp = Spinner::new(Spinners::Dots12, "Generating commit message suggestions...".into());
             let suggestions = generator.generate_suggestions(&changes, &diff, 3).await?;
+            sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Suggestions generated!").green()));
 
-            println!("\n{}", "Suggested commit messages:".bold());
+            println!("\n{} {}", SPARKLE, style("Suggested commit messages:").cyan().bold());
             for (i, message) in suggestions.iter().enumerate() {
-                println!("\n{}. {}", (i + 1).to_string().bold(), message.green());
+                println!("\n{}. {}", (i + 1).to_string().bold(), style(message).green());
             }
 
-            print!("\nSelect a message to use (1-3) or press Enter to skip: ");
+            print!("\n{} Select a message to use (1-3) or press Enter to skip: ", PENCIL);
             io::stdout().flush()?;
 
             let mut input = String::new();
@@ -157,20 +173,21 @@ async fn main() -> anyhow::Result<()> {
             if let Ok(choice) = input.trim().parse::<usize>() {
                 if choice > 0 && choice <= suggestions.len() {
                     let message = &suggestions[choice - 1];
+                    let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                     repo.create_commit(message)?;
-                    println!("\n{}", "Commit created successfully!".green().bold());
+                    sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
                 }
             } else {
-                println!("No message selected. You can still create a commit manually.");
+                println!("\n{} {}", CROSS, style("No message selected. You can still create a commit manually.").yellow());
             }
         }
         Commands::Config { api_key, show } => {
             let mut config = config::Config::load()?;
             
             if let Some(ref key) = api_key {
-                println!("Setting API key...");
+                println!("{} {}", PENCIL, style("Setting API key...").cyan());
                 config.set_api_key(key.clone())?;
-                println!("{}", "API key saved successfully!".green());
+                println!("{} {}", CHECKMARK, style("API key saved successfully!").green());
             }
 
             if show || api_key.is_none() {
@@ -178,34 +195,34 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Explain { description } => {
-            println!("{}", "Analyzing your request...".bold());
+            println!("{} {}", PENCIL, style("Analyzing your request...").cyan().bold());
             
             let config = config::Config::load()?;
             let suggester = command_suggest::CommandSuggester::new(config);
             
             match suggester.suggest(&description).await {
                 Ok(suggestion) => {
-                    println!("\n{}", "Here's what you can do:".bold());
+                    println!("\n{} {}", SPARKLE, style("Here's what you can do:").cyan().bold());
                     println!("{}", suggestion);
                 }
                 Err(e) => {
-                    println!("{}", format!("Error getting suggestion: {}", e).red());
+                    println!("{} {}", CROSS, style(format!("Error getting suggestion: {}", e)).red());
                 }
             }
         }
         Commands::Diff => {
-            println!("{}", "Analyzing diff...".bold());
+            println!("{} {}", PENCIL, style("Analyzing diff...").cyan().bold());
             let repo = git::GitRepo::open(".")?;
             
             if !repo.has_staged_changes()? {
-                println!("{}", "\nNo staged changes found. Stage some changes first with 'git add'".yellow());
+                println!("\n{} {}", CROSS, style("No staged changes found. Stage some changes first with 'git add'").yellow());
                 return Ok(());
             }
 
             let changes = repo.get_staged_changes()?;
             
             // Print summary statistics
-            println!("\n{}", "Summary".bold().underline());
+            println!("\n{} {}", SPARKLE, style("Summary").cyan().bold().underlined());
             println!("{} {}, {} {}, {} {}",
                 changes.stats.files_changed.to_string().bold(),
                 if changes.stats.files_changed == 1 { "file" } else { "files" },
@@ -217,48 +234,48 @@ async fn main() -> anyhow::Result<()> {
             
             // Print file changes summary
             if !changes.added.is_empty() {
-                println!("\n{}", "Added files:".green().bold());
+                println!("\n{} {}", SPARKLE, style("Added files:").cyan().bold());
                 for file in changes.added {
-                    println!("  {} {}", "+".green().bold(), file.green());
+                    println!("  {} {}", "+".green().bold(), style(file).green());
                 }
             }
             
             if !changes.modified.is_empty() {
-                println!("\n{}", "Modified files:".yellow().bold());
+                println!("\n{} {}", SPARKLE, style("Modified files:").cyan().bold());
                 for file in changes.modified {
-                    println!("  {} {}", "*".yellow().bold(), file.yellow());
+                    println!("  {} {}", "*".yellow().bold(), style(file).yellow());
                 }
             }
             
             if !changes.deleted.is_empty() {
-                println!("\n{}", "Deleted files:".red().bold());
+                println!("\n{} {}", SPARKLE, style("Deleted files:").cyan().bold());
                 for file in changes.deleted {
-                    println!("  {} {}", "-".red().bold(), file.red());
+                    println!("  {} {}", "-".red().bold(), style(file).red());
                 }
             }
             
             if !changes.renamed.is_empty() {
-                println!("\n{}", "Renamed files:".blue().bold());
+                println!("\n{} {}", SPARKLE, style("Renamed files:").cyan().bold());
                 for (old, new) in changes.renamed {
                     println!("  {} {} {} {}", 
                         "→".blue().bold(),
-                        old.strikethrough(),
+                        style(old).strikethrough(),
                         "→".blue().bold(),
-                        new.blue()
+                        style(new).blue()
                     );
                 }
             }
 
             // Print detailed diff
-            println!("\n{}", "Detailed changes:".bold().underline());
+            println!("\n{} {}", SPARKLE, style("Detailed changes:").cyan().bold().underlined());
             let hunks = repo.get_structured_diff()?;
             for hunk in hunks {
-                println!("\n{}", hunk.header.cyan());
+                println!("\n{}", style(hunk.header).cyan());
                 for line in hunk.lines {
                     match line.origin {
-                        '+' => print!("{}", line.content.green()),
-                        '-' => print!("{}", line.content.red()),
-                        _ => print!("{}", line.content.dimmed()),
+                        '+' => print!("{}", style(line.content).green()),
+                        '-' => print!("{}", style(line.content).red()),
+                        _ => print!("{}", style(line.content).dim()),
                     }
                 }
             }
