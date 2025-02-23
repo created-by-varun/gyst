@@ -20,11 +20,7 @@ pub enum Commands {
     },
     
     /// Get multiple commit message suggestions
-    Suggest {
-        /// Number of suggestions to generate
-        #[arg(short, long, default_value_t = 3)]
-        count: u8,
-    },
+    Suggest,
     
     /// Configure gyst settings
     Config {

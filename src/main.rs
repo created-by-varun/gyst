@@ -103,7 +103,7 @@ async fn main() -> anyhow::Result<()> {
                 println!("\n{}", "Commit created successfully!".green().bold());
             }
         }
-        Commands::Suggest { count } => {
+        Commands::Suggest => {
             let repo = git::GitRepo::open(".")?;
             
             // Check if there are any staged changes
@@ -140,15 +140,15 @@ async fn main() -> anyhow::Result<()> {
             let config = config::Config::load()?;
             let generator = ai::CommitMessageGenerator::new(config);
 
-            println!("{}", format!("Generating {} commit message suggestions...", count).bold());
-            let suggestions = generator.generate_suggestions(&changes, &diff, count).await?;
+            println!("Generating commit message suggestions...");
+            let suggestions = generator.generate_suggestions(&changes, &diff, 3).await?;
 
             println!("\n{}", "Suggested commit messages:".bold());
             for (i, message) in suggestions.iter().enumerate() {
                 println!("\n{}. {}", (i + 1).to_string().bold(), message.green());
             }
 
-            print!("\nSelect a message to use (1-{}) or press Enter to skip: ", count);
+            print!("\nSelect a message to use (1-3) or press Enter to skip: ");
             io::stdout().flush()?;
 
             let mut input = String::new();

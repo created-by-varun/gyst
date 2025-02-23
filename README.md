@@ -75,23 +75,16 @@ gyst commit -q
 ### Get Multiple Suggestions
 
 ```bash
-gyst suggest [options]
+gyst suggest
 ```
 
-Generates multiple commit message suggestions for you to choose from.
-
-**Options:**
-
-- `-c, --count <number>`: Number of suggestions to generate (default: 3)
+Generates three commit message suggestions for you to choose from. If there are no staged changes, it will offer to stage all changes first.
 
 **Example:**
 
 ```bash
-# Get default 3 suggestions
+# Get 3 suggestions
 gyst suggest
-
-# Get 5 suggestions
-gyst suggest -c 5
 ```
 
 ### Configure Settings
