@@ -24,6 +24,29 @@ curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/master/instal
 2. Make it executable: `chmod +x gyst-darwin-$(uname -m)`
 3. Move it to your PATH: `sudo mv gyst-darwin-$(uname -m) /usr/local/bin/gyst`
 
+### Updating
+To update gyst to the latest version, you can use either method:
+
+1. Using the install script (recommended):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/master/install.sh | bash
+   ```
+   The script will automatically detect and replace any existing installation.
+
+2. Manual update:
+   ```bash
+   # Remove existing installation
+   sudo rm -f /usr/local/bin/gyst
+   
+   # Download and install the latest version
+   curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/master/install.sh | bash
+   ```
+
+To check your current version:
+```bash
+gyst --version
+```
+
 ## Configuration
 
 Before using Gyst, you'll need to set up your AI provider API key:
