@@ -2,7 +2,6 @@ mod cli;
 mod git;
 mod ai;
 mod config;
-mod utils;
 mod command_suggest;
 
 use clap::Parser;
