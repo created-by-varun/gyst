@@ -47,6 +47,23 @@ impl GitRepo {
         Ok(Self { repo })
     }
 
+    /// Stage all changes in the repository
+    pub fn stage_all(&self) -> Result<()> {
+        let mut index = self.repo.index()?;
+        
+        // Add all changes to the index
+        index.add_all(
+            ["*"].iter(),
+            git2::IndexAddOption::DEFAULT,
+            None,
+        )?;
+        
+        // Write the index to disk
+        index.write()?;
+        
+        Ok(())
+    }
+
     /// Check if there are any staged changes in the repository
     pub fn has_staged_changes(&self) -> Result<bool> {
         let mut opts = StatusOptions::new();
