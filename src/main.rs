@@ -7,6 +7,7 @@ mod utils;
 use clap::Parser;
 use cli::{Cli, Commands};
 use colored::*;
+use std::io::{self, Write};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,21 +15,140 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Commit { quick } => {
-            println!("Generating commit message... Quick mode: {}", quick);
-            // TODO: Implement commit logic
+            let repo = git::GitRepo::open(".")?;
+            
+            if !repo.has_staged_changes()? {
+                println!("{}", "\nNo staged changes found. Stage some changes first with 'git add'".yellow());
+                return Ok(());
+            }
+
+            let changes = repo.get_staged_changes()?;
+            let hunks = repo.get_structured_diff()?;
+            
+            // Convert hunks to a single diff string
+            let mut diff = String::new();
+            for hunk in &hunks {
+                diff.push_str(&hunk.header);
+                for line in &hunk.lines {
+                    diff.push_str(&line.content);
+                }
+            }
+
+            // Load config and create AI client
+            let config = config::Config::load()?;
+            let generator = ai::CommitMessageGenerator::new(config);
+
+            println!("{}", "Generating commit message...".bold());
+            let message = generator.generate_message(&changes, &diff).await?;
+
+            if quick {
+                // Use the message directly in quick mode
+                repo.create_commit(&message)?;
+                println!("\n{}", "Commit created successfully!".green().bold());
+                println!("Message: {}", message);
+            } else {
+                // Show the message and ask for confirmation
+                println!("\nProposed commit message:");
+                println!("{}", message.green());
+                print!("\nUse this message? [Y/n/e(edit)] ");
+                io::stdout().flush()?;
+
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                
+                let message = match input.trim().to_lowercase().as_str() {
+                    "n" | "no" => {
+                        println!("Commit aborted");
+                        return Ok(());
+                    }
+                    "e" | "edit" => {
+                        // Create a temporary file with the message
+                        let mut temp = tempfile::NamedTempFile::new()?;
+                        writeln!(temp, "{}", message)?;
+                        
+                        // Get the path before the file is closed
+                        let temp_path = temp.path().to_path_buf();
+                        
+                        // Open in the default editor
+                        let status = std::process::Command::new(std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string()))
+                            .arg(&temp_path)
+                            .status()?;
+                        
+                        if !status.success() {
+                            println!("Editor returned with error");
+                            return Ok(());
+                        }
+                        
+                        // Read back the edited message
+                        let edited = std::fs::read_to_string(&temp_path)?;
+                        edited.trim().to_string()
+                    }
+                    _ => message,
+                };
+
+                repo.create_commit(&message)?;
+                println!("\n{}", "Commit created successfully!".green().bold());
+            }
         }
         Commands::Suggest { count } => {
-            println!("Generating {} suggestions...", count);
-            // TODO: Implement suggest logic
+            let repo = git::GitRepo::open(".")?;
+            
+            if !repo.has_staged_changes()? {
+                println!("{}", "\nNo staged changes found. Stage some changes first with 'git add'".yellow());
+                return Ok(());
+            }
+
+            let changes = repo.get_staged_changes()?;
+            let hunks = repo.get_structured_diff()?;
+            
+            // Convert hunks to a single diff string
+            let mut diff = String::new();
+            for hunk in &hunks {
+                diff.push_str(&hunk.header);
+                for line in &hunk.lines {
+                    diff.push_str(&line.content);
+                }
+            }
+
+            // Load config and create AI client
+            let config = config::Config::load()?;
+            let generator = ai::CommitMessageGenerator::new(config);
+
+            println!("{}", format!("Generating {} commit message suggestions...", count).bold());
+            let suggestions = generator.generate_suggestions(&changes, &diff, count).await?;
+
+            println!("\n{}", "Suggested commit messages:".bold());
+            for (i, message) in suggestions.iter().enumerate() {
+                println!("\n{}. {}", (i + 1).to_string().bold(), message.green());
+            }
+
+            print!("\nSelect a message to use (1-{}) or press Enter to skip: ", count);
+            io::stdout().flush()?;
+
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            
+            if let Ok(choice) = input.trim().parse::<usize>() {
+                if choice > 0 && choice <= suggestions.len() {
+                    let message = &suggestions[choice - 1];
+                    repo.create_commit(message)?;
+                    println!("\n{}", "Commit created successfully!".green().bold());
+                }
+            } else {
+                println!("No message selected. You can still create a commit manually.");
+            }
         }
         Commands::Config { api_key, show } => {
-            if let Some(key) = api_key {
-                println!("Setting API key: {}", key);
-                // TODO: Implement config setting
+            let mut config = config::Config::load()?;
+            
+            if let Some(ref key) = api_key {
+                println!("Setting API key...");
+                config.set_api_key(key.clone())?;
+                println!("{}", "API key saved successfully!".green());
             }
-            if show {
-                println!("Showing configuration");
-                // TODO: Implement config display
+
+            if show || api_key.is_none() {
+                println!("{}", config.display());
             }
         }
         Commands::Diff => {

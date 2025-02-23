@@ -19,6 +19,7 @@ pub struct DiffStats {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct DiffHunk {
     pub old_start: u32,
     pub old_lines: u32,
@@ -181,35 +182,6 @@ impl GitRepo {
         }
 
         Ok(hunks)
-    }
-
-    /// Get the diff of staged changes
-    pub fn get_staged_diff(&self) -> Result<String> {
-        let mut diff_opts = git2::DiffOptions::new();
-        
-        // Get the current index (staged changes)
-        let index = self.repo.index()?;
-        
-        // Get the diff between HEAD and index (staged changes)
-        let diff = if let Ok(head) = self.repo.head() {
-            let tree = head.peel_to_tree()?;
-            self.repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut diff_opts))
-        } else {
-            // If there's no HEAD (initial commit), diff against an empty tree
-            let empty_tree = self.repo.find_tree(git2::Oid::zero())?;
-            self.repo.diff_tree_to_index(Some(&empty_tree), Some(&index), Some(&mut diff_opts))
-        }.context("Failed to generate diff")?;
-
-        let mut diff_string = String::new();
-        diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-            use std::str;
-            if let Ok(content) = str::from_utf8(line.content()) {
-                diff_string.push_str(content);
-            }
-            true
-        })?;
-
-        Ok(diff_string)
     }
 
     /// Create a commit with the given message
