@@ -16,7 +16,7 @@ Gyst is a command-line tool that simplifies git commit workflows by using AI to 
 
 ### Quick Install (macOS)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/master/install.sh | bash
 ```
 
 ### Manual Installation
