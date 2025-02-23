@@ -1,1 +1,8 @@
-Testing commit message generation
+# Test File
+
+This is a test file to demonstrate the features of Gyst:
+
+1. AI-powered commit messages
+2. Multiple suggestion options
+3. Smart diff analysis
+4. Configuration management
