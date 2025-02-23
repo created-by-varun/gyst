@@ -22,6 +22,18 @@ cd gyst
 cargo install --path .
 ```
 
+### Quick Install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/main/install.sh | bash
+```
+
+### Manual Installation
+
+1. Download the latest binary for your system from [Releases](https://github.com/created-by-varun/gyst/releases)
+2. Make it executable: `chmod +x gyst-darwin-*`
+3. Move it to your PATH: `sudo mv gyst-darwin-* /usr/local/bin/gyst`
+
 ## Configuration
 
 Before using Gyst, you'll need to set up your AI provider API key:
