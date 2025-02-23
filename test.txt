@@ -1,8 +1,13 @@
-# Test File
+# Gyst Features
 
-This is a test file to demonstrate the features of Gyst:
+## Core Features
 
-1. AI-powered commit messages
-2. Multiple suggestion options
-3. Smart diff analysis
-4. Configuration management
+1. Smart Commit Messages
+   - AI-powered commit message generation
+   - Conventional commit format
+   - Context-aware suggestions
+
+2. Configuration
+   - API key management
+   - Custom templates
+   - Protected branches
