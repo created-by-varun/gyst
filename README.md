@@ -14,25 +14,15 @@ Gyst is a command-line tool that simplifies git commit workflows by using AI to 
 
 ## Installation
 
-### From Source
-
-```bash
-git clone https://github.com/created-by-varun/gyst
-cd gyst
-cargo install --path .
-```
-
-### Quick Install (recommended)
-
+### Quick Install (macOS)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/created-by-varun/gyst/main/install.sh | bash
 ```
 
 ### Manual Installation
-
-1. Download the latest binary for your system from [Releases](https://github.com/created-by-varun/gyst/releases)
-2. Make it executable: `chmod +x gyst-darwin-*`
-3. Move it to your PATH: `sudo mv gyst-darwin-* /usr/local/bin/gyst`
+1. Download the latest release for your architecture from the [releases page](https://github.com/created-by-varun/gyst/releases)
+2. Make it executable: `chmod +x gyst-darwin-$(uname -m)`
+3. Move it to your PATH: `sudo mv gyst-darwin-$(uname -m) /usr/local/bin/gyst`
 
 ## Configuration
 
