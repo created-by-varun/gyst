@@ -1,6 +1,6 @@
 [package]
 name = "gyst"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Varun V <varunv@example.com>"]
 description = "A Git commit message generator powered by AI"
