@@ -3,6 +3,7 @@ mod git;
 mod ai;
 mod config;
 mod utils;
+mod command_suggest;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -175,6 +176,22 @@ async fn main() -> anyhow::Result<()> {
 
             if show || api_key.is_none() {
                 println!("{}", config.display());
+            }
+        }
+        Commands::Explain { description } => {
+            println!("{}", "Analyzing your request...".bold());
+            
+            let config = config::Config::load()?;
+            let suggester = command_suggest::CommandSuggester::new(config);
+            
+            match suggester.suggest(&description).await {
+                Ok(suggestion) => {
+                    println!("\n{}", "Here's what you can do:".bold());
+                    println!("{}", suggestion);
+                }
+                Err(e) => {
+                    println!("{}", format!("Error getting suggestion: {}", e).red());
+                }
             }
         }
         Commands::Diff => {

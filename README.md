@@ -10,6 +10,7 @@ Gyst is a command-line tool that simplifies git commit workflows by using AI to 
 - **Quick Mode**: Fast commit workflow without confirmation prompts
 - **Interactive Editing**: Edit generated messages before committing
 - **Smart Diff Analysis**: Analyze staged changes for better context
+- **Command Help**: Get AI-powered suggestions for Git commands based on what you want to do
 
 ## Installation
 
@@ -85,6 +86,27 @@ Generates three commit message suggestions for you to choose from. If there are 
 ```bash
 # Get 3 suggestions
 gyst suggest
+```
+
+### Get Git Command Suggestions
+
+```bash
+gyst explain "your description here"
+```
+
+Get AI-powered suggestions for Git commands based on natural language descriptions of what you want to do.
+
+**Examples:**
+
+```bash
+# Find out how to undo the last commit
+gyst explain "how do I undo my last commit"
+
+# Learn how to create and switch to a new branch
+gyst explain "create and switch to a new branch"
+
+# Get help with resolving merge conflicts
+gyst explain "how to resolve merge conflicts"
 ```
 
 ### Configure Settings

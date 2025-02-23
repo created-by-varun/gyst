@@ -22,6 +22,13 @@ pub enum Commands {
     /// Get multiple commit message suggestions
     Suggest,
     
+    /// Get suggestions for Git commands based on what you want to do
+    Explain {
+        /// Description of what you want to do
+        #[arg(value_name = "DESCRIPTION")]
+        description: String,
+    },
+    
     /// Configure gyst settings
     Config {
         /// Set the OpenAI API key
