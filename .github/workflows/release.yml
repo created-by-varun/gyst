@@ -9,26 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-
-  build-release:
-    needs: create-release
+  build-and-release:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -59,12 +40,17 @@ jobs:
         run: |
           shasum -a 256 gyst-${{ matrix.suffix }} > gyst-${{ matrix.suffix }}.sha256
 
-      - name: Upload Release Assets
+      - name: Create Release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
           files: |
             gyst-${{ matrix.suffix }}
             gyst-${{ matrix.suffix }}.sha256
+          generate_release_notes: true
