@@ -1,0 +1,7 @@
+This is a test file to demonstrate the commit functionality of gyst.
+
+Features:
+1. AI-powered commit messages
+2. Multiple suggestion options
+3. Interactive editing
+4. Conventional commit format
