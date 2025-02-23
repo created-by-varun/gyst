@@ -86,6 +86,21 @@ impl GitRepo {
         }))
     }
 
+    /// Check if there are any changes (staged or unstaged) in the repository
+    pub fn has_any_changes(&self) -> Result<bool> {
+        let mut opts = StatusOptions::new();
+        opts.include_untracked(true)
+            .include_ignored(false)
+            .include_unmodified(false)
+            .exclude_submodules(true);
+
+        let statuses = self.repo
+            .statuses(Some(&mut opts))
+            .context("Failed to get repository status")?;
+
+        Ok(!statuses.is_empty())
+    }
+
     /// Get a summary of staged changes
     pub fn get_staged_changes(&self) -> Result<StagedChanges> {
         let mut changes = StagedChanges {

@@ -25,6 +25,12 @@ async fn main() -> anyhow::Result<()> {
         Commands::Commit { quick } => {
             let repo = git::GitRepo::open(".")?;
 
+            // Check if there are any changes at all
+            if !repo.has_any_changes()? {
+                println!("\n{} {}", CROSS, style("No changes found in the repository.").yellow());
+                return Ok(());
+            }
+
             // Check if there are any staged changes
             if !repo.has_staged_changes()? {
                 println!("\n{} {}", CROSS, style("No staged changes found.").yellow());
@@ -120,6 +126,12 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Suggest => {
             let repo = git::GitRepo::open(".")?;
+            
+            // Check if there are any changes at all
+            if !repo.has_any_changes()? {
+                println!("\n{} {}", CROSS, style("No changes found in the repository.").yellow());
+                return Ok(());
+            }
             
             // Check if there are any staged changes
             if !repo.has_staged_changes()? {
