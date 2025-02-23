@@ -106,9 +106,22 @@ async fn main() -> anyhow::Result<()> {
         Commands::Suggest { count } => {
             let repo = git::GitRepo::open(".")?;
             
+            // Check if there are any staged changes
             if !repo.has_staged_changes()? {
-                println!("{}", "\nNo staged changes found. Stage some changes first with 'git add'".yellow());
-                return Ok(());
+                println!("\n{}", "No staged changes found.".yellow());
+                print!("Would you like to stage all changes? [y/N] ");
+                io::stdout().flush()?;
+
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                
+                if input.trim().to_lowercase() == "y" {
+                    repo.stage_all()?;
+                    println!("All changes have been staged.");
+                } else {
+                    println!("No changes to commit. Stage your changes using 'git add' first.");
+                    return Ok(());
+                }
             }
 
             let changes = repo.get_staged_changes()?;
