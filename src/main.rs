@@ -10,6 +10,7 @@ use colored::*;
 use std::io::{self, Write};
 use spinners::{Spinner, Spinners};
 use console::{style, Emoji};
+use dialoguer::{theme::ColorfulTheme, Select};
 
 static CHECKMARK: Emoji<'_, '_> = Emoji("✓", "√");
 static CROSS: Emoji<'_, '_> = Emoji("✗", "x");
@@ -73,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
                 // Show the message and ask for confirmation
                 println!("\n{} {}", SPARKLE, style("Proposed commit message:").cyan().bold());
                 println!("{}\n", style(message.as_str()).green());
-                print!("{} Use this message? [Y/n/e(edit)] ", PENCIL);
+                print!("\n{} Use this message? [Y/n/e(edit)] ", PENCIL);
                 io::stdout().flush()?;
 
                 let mut input = String::new();
@@ -158,30 +159,24 @@ async fn main() -> anyhow::Result<()> {
             let suggestions = generator.generate_suggestions(&changes, &diff, 3).await?;
             sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Suggestions generated!").green(), SPARKLE));
 
-            println!("\n{} {}", SPARKLE, style("Here are some commit message suggestions:").cyan().bold());
-            for (i, message) in suggestions.iter().enumerate() {
-                println!("\n{} {}", 
-                    style(format!("{}.", i + 1)).cyan().bold(),
-                    style(message).green()
-                );
-            }
+            // Create selection items with numbers
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("Select a commit message")
+                .default(0)
+                .items(&suggestions)
+                .interact_opt()?;
 
-            print!("\n{} {} ", PENCIL, style("Select a message (1-3) or press Enter to skip:").cyan());
-            io::stdout().flush()?;
-
-            let mut input = String::new();
-            io::stdin().read_line(&mut input)?;
-
-            if let Ok(choice) = input.trim().parse::<usize>() {
-                if choice > 0 && choice <= suggestions.len() {
-                    let message = &suggestions[choice - 1];
+            match selection {
+                Some(index) => {
+                    let message = &suggestions[index];
                     let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                     repo.create_commit(message)?;
                     sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
                     println!("\n{} {}\n{}\n", PENCIL, style("Final Commit Message:").cyan().bold(), message);
                 }
-            } else {
-                println!("\n{} {}", CROSS, style("No message selected. You can still create a commit manually.").yellow());
+                None => {
+                    println!("\n{} {}", CROSS, style("No message selected. You can still create a commit manually.").yellow());
+                }
             }
         }
         Commands::Explain { description } => {
