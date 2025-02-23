@@ -10,16 +10,16 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            suffix: darwin-x86_64
-          - os: macos-latest
+          - runner: macos-14
             target: aarch64-apple-darwin
             suffix: darwin-aarch64
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            suffix: darwin-x86_64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v4
