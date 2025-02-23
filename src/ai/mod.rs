@@ -144,7 +144,7 @@ impl CommitMessageGenerator {
             let request = AnthropicRequest {
                 model: "claude-3-5-haiku-20241022".to_string(),
                 max_tokens: 200,
-                temperature: 0.0,
+                temperature: 0.7,  // Increased temperature for more varied suggestions
                 system: SYSTEM_PROMPT.to_string(),
                 messages: vec![AnthropicMessage {
                     role: "user".to_string(),
