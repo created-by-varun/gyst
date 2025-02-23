@@ -11,3 +11,8 @@
    - API key management
    - Custom templates
    - Protected branches
+
+3. Diff Analysis
+   - Change statistics
+   - File categorization
+   - Line-by-line changes
