@@ -2,6 +2,13 @@
 name = "gyst"
 version = "0.1.0"
 edition = "2024"
+authors = ["Varun V <varunv@example.com>"]
+description = "A Git commit message generator powered by AI"
+repository = "https://github.com/created-by-varun/gyst"
+license = "MIT"
+readme = "README.md"
+keywords = ["git", "commit", "ai", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow = "1.0.96"
