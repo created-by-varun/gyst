@@ -46,7 +46,7 @@ BINARY="gyst-darwin-${ARCH}"
 
 # GitHub repository information
 REPO="created-by-varun/gyst"
-LATEST_RELEASE_TAG="v0.1.0"
+LATEST_RELEASE_TAG="v0.1.1"
 
 # Download URLs
 BINARY_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE_TAG/$BINARY"
