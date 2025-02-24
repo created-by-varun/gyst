@@ -28,13 +28,11 @@ pub struct BranchHealth {
     pub name: String,
     pub status: BranchStatus,
     #[serde(skip)]
-    pub age: TimeAgo,
-    #[serde(rename = "age")]
-    pub age_display: String,
-    #[serde(skip)]
     pub last_activity: TimeAgo,
     #[serde(rename = "last_activity")]
     pub last_activity_display: String,
+    #[serde(rename = "age")]
+    pub age_display: String,
     pub author: String,
     pub commit_count: u32,
     pub commit_frequency: f32,
@@ -142,7 +140,6 @@ impl BranchAnalyzer {
             name: branch_name,
             status,
             age_display: age.to_string(),
-            age,
             last_activity_display: last_activity.to_string(),
             last_activity,
             author: commit.author().name().unwrap_or("unknown").to_string(),
