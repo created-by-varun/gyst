@@ -42,4 +42,40 @@ pub enum Commands {
     
     /// Show staged changes with detailed diff
     Diff,
+    
+    /// Analyze and manage git branches
+    Branch {
+        #[command(subcommand)]
+        command: BranchCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BranchCommands {
+    /// Analyze and report branch health status
+    Health {
+        /// Include all branches (local and remote)
+        #[arg(long)]
+        all: bool,
+
+        /// Only remote branches
+        #[arg(long)]
+        remote: bool,
+
+        /// Only local branches
+        #[arg(long)]
+        local: bool,
+
+        /// Consider activity within last N days
+        #[arg(long)]
+        days: Option<u32>,
+
+        /// Filter by author
+        #[arg(long)]
+        author: Option<String>,
+
+        /// Output format (text, json, markdown)
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
 }
