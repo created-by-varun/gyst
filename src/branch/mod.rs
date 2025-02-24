@@ -35,7 +35,6 @@ pub struct BranchHealth {
     pub age_display: String,
     pub author: String,
     pub commit_count: u32,
-    pub commit_frequency: f32,
     pub ahead_count: u32,
     pub behind_count: u32,
 }
@@ -91,49 +90,40 @@ impl BranchAnalyzer {
             None => "unknown".to_string(),
         };
         
-        // Get the latest commit
         let commit = branch_ref.peel_to_commit()
             .context("Failed to get branch commit")?;
         
-        // Calculate time since last activity
         let last_activity = self.calculate_time_ago(commit.time())?;
         
-        // Get commit count and frequency
         let mut revwalk = self.repo.revwalk()?;
         revwalk.push(commit.id())?;
         let commit_count = revwalk.count() as u32;
         
-        // Get ahead/behind counts from main branch
         let (ahead, behind) = self.get_distance_from_main(&branch)?;
-        
-        // Get first commit for age calculation
+
+        let main_branch = self.repo.find_branch("master", BranchType::Local)
+            .or_else(|_| self.repo.find_branch("main", BranchType::Local))
+            .context("Failed to find main branch")?;
+        let main_commit = main_branch.get().peel_to_commit()?;
+        let merge_base = self.repo.merge_base(commit.id(), main_commit.id())?;
+
         let mut revwalk = self.repo.revwalk()?;
         revwalk.push(commit.id())?;
-        revwalk.set_sorting(git2::Sort::REVERSE)?;
-        let first_commit = if let Some(Ok(first_oid)) = revwalk.next() {
-            self.repo.find_commit(first_oid)?
+        revwalk.hide(merge_base)?;
+        let age_time = if let Some(Ok(commit_id)) = revwalk.next() {
+            self.repo.find_commit(commit_id)?.time()
         } else {
-            commit.clone()
+            commit.time()
         };
-        let age = self.calculate_time_ago(first_commit.time())?;
-        
-        // Determine status based on days
+
+        let age = self.calculate_time_ago(age_time)?;
+
         let status = if last_activity.days >= self.stale_days {
             BranchStatus::Stale
         } else if last_activity.days >= self.inactive_days {
             BranchStatus::NeedsAttention
         } else {
             BranchStatus::Healthy
-        };
-        
-        let commit_frequency = if last_activity.days > 0 {
-            commit_count as f32 / last_activity.days as f32
-        } else if last_activity.hours > 0 {
-            commit_count as f32 * 24.0 / last_activity.hours as f32
-        } else if last_activity.minutes > 0 {
-            commit_count as f32 * 24.0 * 60.0 / last_activity.minutes as f32
-        } else {
-            commit_count as f32
         };
 
         Ok(BranchHealth {
@@ -144,14 +134,12 @@ impl BranchAnalyzer {
             last_activity,
             author: commit.author().name().unwrap_or("unknown").to_string(),
             commit_count,
-            commit_frequency,
             ahead_count: ahead as u32,
             behind_count: behind as u32,
         })
     }
 
     fn get_distance_from_main(&self, branch: &Branch) -> Result<(usize, usize)> {
-        // Try to find main/master branch
         let main_branch = self.repo.find_branch("main", BranchType::Local)
             .or_else(|_| self.repo.find_branch("master", BranchType::Local))
             .context("Failed to find main or master branch")?;
@@ -181,14 +169,12 @@ impl BranchAnalyzer {
             for branch_result in branches {
                 let (branch, _) = branch_result?;
                 if let Ok(health) = self.analyze_branch(&branch) {
-                    // Filter by days if specified
                     if let Some(max_days) = days {
                         if health.last_activity.days > max_days {
                             continue;
                         }
                     }
                     
-                    // Filter by author if specified
                     if let Some(ref target_author) = author {
                         if health.author != *target_author {
                             continue;
@@ -251,7 +237,7 @@ fn format_text(results: &[BranchHealth]) -> Result<String> {
         output.push_str(&format!("├── Age: {}\n", health.age_display));
         output.push_str(&format!("├── Last Activity: {}\n", health.last_activity_display));
         output.push_str(&format!("├── Author: {}\n", health.author));
-        output.push_str(&format!("├── Commits: {} ({:.1}/day)\n", health.commit_count, health.commit_frequency));
+        output.push_str(&format!("├── Commits: {}\n", health.commit_count));
         output.push_str(&format!("└── Main Distance: {} ahead, {} behind\n\n", health.ahead_count, health.behind_count));
     }
 
@@ -276,7 +262,7 @@ fn format_markdown(results: &[BranchHealth]) -> Result<String> {
         output.push_str(&format!("| Age | {} |\n", health.age_display));
         output.push_str(&format!("| Last Activity | {} |\n", health.last_activity_display));
         output.push_str(&format!("| Author | {} |\n", health.author));
-        output.push_str(&format!("| Commits | {} ({:.1}/day) |\n", health.commit_count, health.commit_frequency));
+        output.push_str(&format!("| Commits | {} |\n", health.commit_count));
         output.push_str(&format!("| Main Distance | {} ahead, {} behind |\n\n", health.ahead_count, health.behind_count));
     }
 
