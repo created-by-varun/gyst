@@ -141,6 +141,54 @@ gyst explain "create and switch to a new branch"
 gyst explain "how to resolve merge conflicts"
 ```
 
+### Branch Health Analysis
+
+```bash
+gyst branch health [options]
+```
+
+Analyze and report the health status of git branches in your repository. Helps identify stale branches, track activity, and manage branch maintenance.
+
+**Options:**
+
+- `--all`: Include all branches (local and remote)
+- `--remote`: Only analyze remote branches
+- `--local`: Only analyze local branches (default)
+- `--days <number>`: Consider activity within last N days
+- `--author <name>`: Filter branches by author
+- `--format <format>`: Output format (text, json, markdown)
+
+**Examples:**
+
+```bash
+# View health of local branches
+gyst branch health
+
+# Include remote branches
+gyst branch health --all
+
+# Filter by age (30 days)
+gyst branch health --days 30
+
+# Filter by author
+gyst branch health --author "John Doe"
+
+# Output in markdown format
+gyst branch health --format markdown
+```
+
+The command analyzes and reports:
+
+- Branch age and creation date
+- Last activity time
+- Commit frequency and count
+- Author information
+- Distance from main branch (commits ahead/behind)
+- Overall health status:
+  - 🟢 Healthy: Recent activity
+  - 🟡 Needs Attention: Inactive for a while
+  - 🔴 Stale: No activity for extended period
+
 ### Configure Settings
 
 ```bash
