@@ -3,6 +3,7 @@ mod git;
 mod ai;
 mod config;
 mod command_suggest;
+mod branch;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -11,6 +12,7 @@ use std::io::{self, Write};
 use spinners::{Spinner, Spinners};
 use console::{style, Emoji};
 use dialoguer::{theme::ColorfulTheme, Select};
+use crate::branch::{BranchAnalyzer, BranchFilter, format_output};
 
 static CHECKMARK: Emoji<'_, '_> = Emoji("✓", "√");
 static CROSS: Emoji<'_, '_> = Emoji("✗", "x");
@@ -331,6 +333,24 @@ async fn main() -> anyhow::Result<()> {
                         '-' => print!("{}", style(line.content).red()),
                         _ => print!("{}", style(line.content).dim()),
                     }
+                }
+            }
+        }
+        Commands::Branch { command } => {
+            match command {
+                cli::BranchCommands::Health { all, remote, local: _, days, author, format } => {
+                    let analyzer = BranchAnalyzer::new(".")?;
+                    let filter = if all {
+                        BranchFilter::All
+                    } else if remote {
+                        BranchFilter::Remote
+                    } else {
+                        BranchFilter::Local
+                    };
+
+                    let results = analyzer.analyze_branches(filter, days, author)?;
+                    let output = format_output(&results, format.as_str().into())?;
+                    println!("{}", output);
                 }
             }
         }

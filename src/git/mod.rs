@@ -247,4 +247,33 @@ impl GitRepo {
             &parents,
         ).context("Failed to create commit")
     }
+
+    /// Get a list of all local branches in the repository
+    #[allow(dead_code)]
+    pub fn get_local_branches(&self) -> Result<Vec<git2::Branch>> {
+        let branches = self.repo.branches(Some(git2::BranchType::Local))?
+            .filter_map(|b| b.ok())
+            .map(|(branch, _)| branch)
+            .collect();
+        Ok(branches)
+    }
+
+    /// Get a list of all remote branches in the repository
+    #[allow(dead_code)]
+    pub fn get_remote_branches(&self) -> Result<Vec<git2::Branch>> {
+        let branches = self.repo.branches(Some(git2::BranchType::Remote))?
+            .filter_map(|b| b.ok())
+            .map(|(branch, _)| branch)
+            .collect();
+        Ok(branches)
+    }
+
+    /// Get the current branch name
+    #[allow(dead_code)]
+    pub fn get_current_branch(&self) -> Result<String> {
+        let head = self.repo.head()?;
+        let branch_name = head.shorthand()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get branch name"))?;
+        Ok(branch_name.to_string())
+    }
 }
