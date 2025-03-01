@@ -132,12 +132,3 @@ Response:
   "suggestion": "COMMAND: git reset --soft HEAD~1\nEXPLANATION: This command undoes the last commit but keeps the changes staged.\nNOTE: This is safe to use if you haven't pushed the commit to a remote repository."
 }
 ```
-
-## Deployment
-
-For production deployment, consider:
-
-- Using a reverse proxy like Nginx
-- Setting up SSL/TLS
-- Running as a systemd service
-- Using Docker for containerization
