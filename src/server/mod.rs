@@ -45,8 +45,8 @@ impl ServerClient {
     }
 
     fn get_server_url(&self) -> String {
-        // Use a fixed server URL
-        "http://127.0.0.1:8080".to_string()
+        // Use the deployed server URL
+        "https://gyst-cli.vercel.app".to_string()
     }
 
     pub async fn generate_message(&self, changes: &StagedChanges, diff: &str) -> Result<String> {
