@@ -142,18 +142,23 @@ async fn main() -> anyhow::Result<()> {
                     style("Proposed commit message:").cyan().bold()
                 );
                 println!("{}\n", style(message.as_str()).green());
-                print!("\n{} Use this message? [Y/n/e(edit)] ", PENCIL);
-                io::stdout().flush()?;
 
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
+                // Create selection items for commit actions
+                let options = vec!["Accept and commit", "Edit message", "Reject and abort"];
 
-                let message = match input.trim().to_lowercase().as_str() {
-                    "n" | "no" => {
-                        println!("\n{} {}", CROSS, style("Commit aborted").yellow());
-                        return Ok(());
+                let selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("What would you like to do?")
+                    .default(0)
+                    .items(&options)
+                    .interact_opt()?;
+
+                let message = match selection {
+                    Some(0) => {
+                        // Accept and commit (default)
+                        message
                     }
-                    "e" | "edit" => {
+                    Some(1) => {
+                        // Edit message
                         println!("\n{} {}", PENCIL, style("Opening in editor...").cyan());
                         // Create a temporary file with the message
                         let mut temp = tempfile::NamedTempFile::new()?;
@@ -178,7 +183,12 @@ async fn main() -> anyhow::Result<()> {
                         let edited = std::fs::read_to_string(&temp_path)?;
                         edited.trim().to_string()
                     }
-                    _ => message,
+                    Some(2) | None => {
+                        // Reject and abort or user cancelled
+                        println!("\n{} {}", CROSS, style("Commit aborted").yellow());
+                        return Ok(());
+                    }
+                    _ => unreachable!(),
                 };
 
                 // Create the commit
