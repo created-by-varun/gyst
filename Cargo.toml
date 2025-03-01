@@ -1,6 +1,6 @@
 [package]
 name = "gyst"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 authors = ["Varun V <varunv@example.com>"]
 description = "A Git commit message generator powered by AI"
@@ -26,6 +26,7 @@ console = "0.15.8"
 tempfile = "3.10.1"
 tokio = { version = "1.43.0", features = ["full"] }
 toml = "0.8.10"
+chrono = "0.4.34"
 
 [dev-dependencies]
 mockall = "0.13.1"

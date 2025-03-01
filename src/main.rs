@@ -1,16 +1,19 @@
-mod cli;
-mod git;
 mod ai;
-mod config;
+mod branch;
+mod cli;
 mod command_suggest;
+mod config;
+mod git;
+mod server;
 
+use crate::branch::{BranchAnalyzer, BranchFilter, format_output};
 use clap::Parser;
 use cli::{Cli, Commands};
 use colored::*;
-use std::io::{self, Write};
+use console::{Emoji, style};
+use dialoguer::{Select, theme::ColorfulTheme};
 use spinners::{Spinner, Spinners};
-use console::{style, Emoji};
-use dialoguer::{theme::ColorfulTheme, Select};
+use std::io::{self, Write};
 
 static CHECKMARK: Emoji<'_, '_> = Emoji("✓", "√");
 static CROSS: Emoji<'_, '_> = Emoji("✗", "x");
@@ -22,12 +25,16 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Commit { quick } => {
+        Commands::Commit { quick, push } => {
             let repo = git::GitRepo::open(".")?;
 
             // Check if there are any changes at all
             if !repo.has_any_changes()? {
-                println!("\n{} {}", CROSS, style("No changes found in the repository.").yellow());
+                println!(
+                    "\n{} {}",
+                    CROSS,
+                    style("No changes found in the repository.").yellow()
+                );
                 return Ok(());
             }
 
@@ -39,20 +46,30 @@ async fn main() -> anyhow::Result<()> {
 
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
-                
+
                 if input.trim().to_lowercase() == "y" {
                     let mut sp = Spinner::new(Spinners::Dots9, "Staging all changes...".into());
                     repo.stage_all()?;
-                    sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("All changes have been staged").green(), SPARKLE));
+                    sp.stop_with_message(format!(
+                        "{} {} {}\n",
+                        CHECKMARK,
+                        style("All changes have been staged").green(),
+                        SPARKLE
+                    ));
                 } else {
-                    println!("\n{} {}", CROSS, style("No changes to commit. Stage your changes using 'git add' first.").yellow());
+                    println!(
+                        "\n{} {}",
+                        CROSS,
+                        style("No changes to commit. Stage your changes using 'git add' first.")
+                            .yellow()
+                    );
                     return Ok(());
                 }
             }
 
             let changes = repo.get_staged_changes()?;
             let hunks = repo.get_structured_diff()?;
-            
+
             // Convert hunks to a single diff string
             let mut diff = String::new();
             for hunk in &hunks {
@@ -62,30 +79,75 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            // Load config and create AI client
+            // Load config
             let config = config::Config::load()?;
-            let generator = ai::CommitMessageGenerator::new(config);
 
-            let mut sp = Spinner::new(Spinners::Dots12, "Analyzing changes and generating commit message...".into());
-            let message = generator.generate_message(&changes, &diff).await?;
-            sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Commit message generated!").green()));
+            let mut sp = Spinner::new(
+                Spinners::Dots12,
+                "Analyzing changes and generating commit message...".into(),
+            );
+
+            let message = if config.use_server() {
+                // Use server client
+                let server_client = server::ServerClient::new(config);
+
+                // Optional: Check server health
+                if let Err(e) = server_client.health_check().await {
+                    sp.stop_with_message(format!(
+                        "{} {}\n",
+                        CROSS,
+                        style("Failed to connect to server").red()
+                    ));
+                    println!(
+                        "Error: {}. Check server URL or use direct API mode with 'gyst config --use-server false'",
+                        e
+                    );
+                    return Ok(());
+                }
+
+                server_client.generate_message(&changes, &diff).await?
+            } else {
+                // Use direct API client
+                let generator = ai::CommitMessageGenerator::new(config);
+                generator.generate_message(&changes, &diff).await?
+            };
+
+            sp.stop_with_message(format!(
+                "{} {}\n",
+                CHECKMARK,
+                style("Commit message generated!").green()
+            ));
 
             if quick {
                 // Use the message directly in quick mode
                 let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                 repo.create_commit(&message)?;
-                sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
-                println!("\n{} {}\n{}\n", PENCIL, style("Commit Message:").cyan().bold(), message);
+                sp.stop_with_message(format!(
+                    "{} {} {}\n",
+                    CHECKMARK,
+                    style("Commit created successfully!").green().bold(),
+                    SPARKLE
+                ));
+                println!(
+                    "\n{} {}\n{}\n",
+                    PENCIL,
+                    style("Commit Message:").cyan().bold(),
+                    message
+                );
             } else {
                 // Show the message and ask for confirmation
-                println!("\n{} {}", SPARKLE, style("Proposed commit message:").cyan().bold());
+                println!(
+                    "\n{} {}",
+                    SPARKLE,
+                    style("Proposed commit message:").cyan().bold()
+                );
                 println!("{}\n", style(message.as_str()).green());
                 print!("\n{} Use this message? [Y/n/e(edit)] ", PENCIL);
                 io::stdout().flush()?;
 
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
-                
+
                 let message = match input.trim().to_lowercase().as_str() {
                     "n" | "no" => {
                         println!("\n{} {}", CROSS, style("Commit aborted").yellow());
@@ -96,20 +158,22 @@ async fn main() -> anyhow::Result<()> {
                         // Create a temporary file with the message
                         let mut temp = tempfile::NamedTempFile::new()?;
                         writeln!(temp, "{}", message)?;
-                        
+
                         // Get the path before the file is closed
                         let temp_path = temp.path().to_path_buf();
-                        
+
                         // Open in the default editor
-                        let status = std::process::Command::new(std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string()))
-                            .arg(&temp_path)
-                            .status()?;
-                        
+                        let status = std::process::Command::new(
+                            std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string()),
+                        )
+                        .arg(&temp_path)
+                        .status()?;
+
                         if !status.success() {
                             println!("{} {}", CROSS, style("Editor returned with error").red());
                             return Ok(());
                         }
-                        
+
                         // Read back the edited message
                         let edited = std::fs::read_to_string(&temp_path)?;
                         edited.trim().to_string()
@@ -120,19 +184,44 @@ async fn main() -> anyhow::Result<()> {
                 // Create the commit
                 let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                 repo.create_commit(&message)?;
-                sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
-                println!("\n{} {}\n{}\n", PENCIL, style("Final Commit Message:").cyan().bold(), message);
+                sp.stop_with_message(format!(
+                    "{} {} {}\n",
+                    CHECKMARK,
+                    style("Commit created successfully!").green().bold(),
+                    SPARKLE
+                ));
+                println!(
+                    "\n{} {}\n{}\n",
+                    PENCIL,
+                    style("Final Commit Message:").cyan().bold(),
+                    message
+                );
+            }
+
+            if push {
+                let mut sp = Spinner::new(Spinners::Dots9, "Pushing changes...".into());
+                repo.push_changes()?;
+                sp.stop_with_message(format!(
+                    "{} {} {}\n",
+                    CHECKMARK,
+                    style("Changes pushed successfully!").green().bold(),
+                    SPARKLE
+                ));
             }
         }
         Commands::Suggest => {
             let repo = git::GitRepo::open(".")?;
-            
+
             // Check if there are any changes at all
             if !repo.has_any_changes()? {
-                println!("\n{} {}", CROSS, style("No changes found in the repository.").yellow());
+                println!(
+                    "\n{} {}",
+                    CROSS,
+                    style("No changes found in the repository.").yellow()
+                );
                 return Ok(());
             }
-            
+
             // Check if there are any staged changes
             if !repo.has_staged_changes()? {
                 println!("\n{} {}", CROSS, style("No staged changes found.").yellow());
@@ -141,20 +230,30 @@ async fn main() -> anyhow::Result<()> {
 
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
-                
+
                 if input.trim().to_lowercase() == "y" {
                     let mut sp = Spinner::new(Spinners::Dots9, "Staging all changes...".into());
                     repo.stage_all()?;
-                    sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("All changes have been staged").green(), SPARKLE));
+                    sp.stop_with_message(format!(
+                        "{} {} {}\n",
+                        CHECKMARK,
+                        style("All changes have been staged").green(),
+                        SPARKLE
+                    ));
                 } else {
-                    println!("\n{} {}", CROSS, style("No changes to commit. Stage your changes using 'git add' first.").yellow());
+                    println!(
+                        "\n{} {}",
+                        CROSS,
+                        style("No changes to commit. Stage your changes using 'git add' first.")
+                            .yellow()
+                    );
                     return Ok(());
                 }
             }
 
             let changes = repo.get_staged_changes()?;
             let hunks = repo.get_structured_diff()?;
-            
+
             // Convert hunks to a single diff string
             let mut diff = String::new();
             for hunk in &hunks {
@@ -165,11 +264,45 @@ async fn main() -> anyhow::Result<()> {
             }
 
             let config = config::Config::load()?;
-            let generator = ai::CommitMessageGenerator::new(config);
 
-            let mut sp = Spinner::new(Spinners::Dots12, "Generating commit message suggestions...".into());
-            let suggestions = generator.generate_suggestions(&changes, &diff, 3).await?;
-            sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Suggestions generated!").green(), SPARKLE));
+            let mut sp = Spinner::new(
+                Spinners::Dots12,
+                "Generating commit message suggestions...".into(),
+            );
+
+            let suggestions = if config.use_server() {
+                // Use server client
+                let server_client = server::ServerClient::new(config);
+
+                // Optional: Check server health
+                if let Err(e) = server_client.health_check().await {
+                    sp.stop_with_message(format!(
+                        "{} {}\n",
+                        CROSS,
+                        style("Failed to connect to server").red()
+                    ));
+                    println!(
+                        "Error: {}. Check server URL or use direct API mode with 'gyst config --use-server false'",
+                        e
+                    );
+                    return Ok(());
+                }
+
+                server_client
+                    .generate_suggestions(&changes, &diff, 3)
+                    .await?
+            } else {
+                // Use direct API client
+                let generator = ai::CommitMessageGenerator::new(config);
+                generator.generate_suggestions(&changes, &diff, 3).await?
+            };
+
+            sp.stop_with_message(format!(
+                "{} {} {}\n",
+                CHECKMARK,
+                style("Suggestions generated!").green(),
+                SPARKLE
+            ));
 
             // Create selection items with numbers
             let selection = Select::with_theme(&ColorfulTheme::default())
@@ -183,27 +316,106 @@ async fn main() -> anyhow::Result<()> {
                     let message = &suggestions[index];
                     let mut sp = Spinner::new(Spinners::Dots9, "Creating commit...".into());
                     repo.create_commit(message)?;
-                    sp.stop_with_message(format!("{} {} {}\n", CHECKMARK, style("Commit created successfully!").green().bold(), SPARKLE));
-                    println!("\n{} {}\n{}\n", PENCIL, style("Final Commit Message:").cyan().bold(), message);
+                    sp.stop_with_message(format!(
+                        "{} {} {}\n",
+                        CHECKMARK,
+                        style("Commit created successfully!").green().bold(),
+                        SPARKLE
+                    ));
+                    println!(
+                        "\n{} {}\n{}\n",
+                        PENCIL,
+                        style("Final Commit Message:").cyan().bold(),
+                        message
+                    );
                 }
                 None => {
-                    println!("\n{} {}", CROSS, style("No message selected. You can still create a commit manually.").yellow());
+                    println!(
+                        "\n{} {}",
+                        CROSS,
+                        style("No message selected. You can still create a commit manually.")
+                            .yellow()
+                    );
                 }
             }
         }
         Commands::Explain { description } => {
-            let mut sp = Spinner::new(Spinners::Dots12, format!("{} {}", SPARKLE, style("Analyzing your request...").cyan().bold()).into());
-            
-            let config = config::Config::load()?;
-            let suggester = command_suggest::CommandSuggester::new(config);
-            
-            match suggester.suggest(&description).await {
-                Ok(suggestion) => {
-                    sp.stop_with_message(format!("{} {}\n", CHECKMARK, style("Analysis complete!").green()));
+            let mut sp = Spinner::new(
+                Spinners::Dots12,
+                format!(
+                    "{} {}",
+                    SPARKLE,
+                    style("Analyzing your request...").cyan().bold()
+                )
+                .into(),
+            );
 
+            let config = config::Config::load()?;
+
+            let suggestion = if config.use_server() {
+                // Use server client
+                let server_client = server::ServerClient::new(config);
+
+                // Optional: Check server health
+                if let Err(e) = server_client.health_check().await {
+                    sp.stop_with_message(format!(
+                        "{} {}\n",
+                        CROSS,
+                        style("Failed to connect to server").red()
+                    ));
+                    println!(
+                        "Error: {}. Check server URL or use direct API mode with 'gyst config --use-server false'",
+                        e
+                    );
+                    return Ok(());
+                }
+
+                match server_client.suggest_command(&description).await {
+                    Ok(suggestion) => {
+                        sp.stop_with_message(format!(
+                            "{} {}\n",
+                            CHECKMARK,
+                            style("Analysis complete!").green()
+                        ));
+                        Ok(suggestion)
+                    }
+                    Err(e) => {
+                        sp.stop_with_message(format!(
+                            "{} {}\n",
+                            CROSS,
+                            style("Analysis failed").red()
+                        ));
+                        Err(e)
+                    }
+                }
+            } else {
+                // Use direct API client
+                let suggester = command_suggest::CommandSuggester::new(config);
+                match suggester.suggest(&description).await {
+                    Ok(suggestion) => {
+                        sp.stop_with_message(format!(
+                            "{} {}\n",
+                            CHECKMARK,
+                            style("Analysis complete!").green()
+                        ));
+                        Ok(suggestion)
+                    }
+                    Err(e) => {
+                        sp.stop_with_message(format!(
+                            "{} {}\n",
+                            CROSS,
+                            style("Analysis failed").red()
+                        ));
+                        Err(e)
+                    }
+                }
+            };
+
+            match suggestion {
+                Ok(suggestion) => {
                     // Parse the suggestion into sections
                     let sections: Vec<&str> = suggestion.split("\nCOMMAND:").collect();
-                    
+
                     if sections.len() > 1 {
                         // First section is the introduction
                         if !sections[0].trim().is_empty() {
@@ -218,14 +430,18 @@ async fn main() -> anyhow::Result<()> {
                                 println!("\n{} {}", PENCIL, style(parts[0].trim()).green().bold());
 
                                 // Split explanation and note if present
-                                let explanation_parts: Vec<&str> = parts[1].split("\nNOTE:").collect();
+                                let explanation_parts: Vec<&str> =
+                                    parts[1].split("\nNOTE:").collect();
                                 println!("   {}", style(explanation_parts[0].trim()).white());
 
                                 // Print note if present, but only if it's important
                                 if explanation_parts.len() > 1 {
                                     let note = explanation_parts[1].trim();
-                                    if note.contains("CAREFUL") || note.contains("WARNING") || 
-                                       note.contains("IMPORTANT") || note.contains("DO NOT") {
+                                    if note.contains("CAREFUL")
+                                        || note.contains("WARNING")
+                                        || note.contains("IMPORTANT")
+                                        || note.contains("DO NOT")
+                                    {
                                         println!("   {} {}", CROSS, style(note).yellow());
                                     }
                                 }
@@ -234,9 +450,16 @@ async fn main() -> anyhow::Result<()> {
 
                         // Print additional tip if present and important
                         if let Some(tip_start) = suggestion.find("\nADDITIONAL TIP:") {
-                            let tip = suggestion[tip_start..].trim().replace("ADDITIONAL TIP:", "").trim().to_string();
-                            if tip.contains("CAREFUL") || tip.contains("WARNING") || 
-                               tip.contains("IMPORTANT") || tip.contains("caution") {
+                            let tip = suggestion[tip_start..]
+                                .trim()
+                                .replace("ADDITIONAL TIP:", "")
+                                .trim()
+                                .to_string();
+                            if tip.contains("CAREFUL")
+                                || tip.contains("WARNING")
+                                || tip.contains("IMPORTANT")
+                                || tip.contains("caution")
+                            {
                                 println!("\n{} {}", SPARKLE, style(tip).yellow().italic());
                             }
                         }
@@ -246,46 +469,97 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 Err(e) => {
-                    sp.stop_with_message(format!("{} {}\n", CROSS, style("Analysis failed").red()));
                     println!("{} {}", CROSS, style(format!("Error: {}", e)).red());
                 }
             }
         }
-        Commands::Config { api_key, show } => {
+        Commands::Config {
+            api_key,
+            show,
+            use_server,
+        } => {
             let mut config = config::Config::load()?;
-            
+
             if let Some(ref key) = api_key {
                 println!("{} {}", PENCIL, style("Setting API key...").cyan());
                 config.set_api_key(key.clone())?;
-                println!("{} {}", CHECKMARK, style("API key saved successfully!").green());
+                println!(
+                    "{} {}",
+                    CHECKMARK,
+                    style("API key saved successfully!").green()
+                );
             }
 
-            if show || api_key.is_none() {
+            if let Some(use_srv) = use_server {
+                println!(
+                    "{} {}",
+                    PENCIL,
+                    style(format!(
+                        "{} server mode...",
+                        if use_srv { "Enabling" } else { "Disabling" }
+                    ))
+                    .cyan()
+                );
+                config.set_use_server(use_srv)?;
+                println!(
+                    "{} {}",
+                    CHECKMARK,
+                    style(format!(
+                        "Server mode {} successfully!",
+                        if use_srv { "enabled" } else { "disabled" }
+                    ))
+                    .green()
+                );
+            }
+
+            if show || (api_key.is_none() && use_server.is_none()) {
                 println!("{}", config.display());
             }
         }
         Commands::Diff => {
             println!("{} {}", PENCIL, style("Analyzing diff...").cyan().bold());
             let repo = git::GitRepo::open(".")?;
-            
+
             if !repo.has_staged_changes()? {
-                println!("\n{} {}", CROSS, style("No staged changes found. Stage some changes first with 'git add'").yellow());
+                println!(
+                    "\n{} {}",
+                    CROSS,
+                    style("No staged changes found. Stage some changes first with 'git add'")
+                        .yellow()
+                );
                 return Ok(());
             }
 
             let changes = repo.get_staged_changes()?;
-            
+
             // Print summary statistics
-            println!("\n{} {}", SPARKLE, style("Summary").cyan().bold().underlined());
-            println!("{} {}, {} {}, {} {}",
-                changes.stats.files_changed.to_string().bold(),
-                if changes.stats.files_changed == 1 { "file" } else { "files" },
-                changes.stats.insertions.to_string().green().bold(),
-                if changes.stats.insertions == 1 { "insertion(+)" } else { "insertions(+)" },
-                changes.stats.deletions.to_string().red().bold(),
-                if changes.stats.deletions == 1 { "deletion(-)" } else { "deletions(-)" }
+            println!(
+                "\n{} {}",
+                SPARKLE,
+                style("Summary").cyan().bold().underlined()
             );
-            
+            println!(
+                "{} {}, {} {}, {} {}",
+                changes.stats.files_changed.to_string().bold(),
+                if changes.stats.files_changed == 1 {
+                    "file"
+                } else {
+                    "files"
+                },
+                changes.stats.insertions.to_string().green().bold(),
+                if changes.stats.insertions == 1 {
+                    "insertion(+)"
+                } else {
+                    "insertions(+)"
+                },
+                changes.stats.deletions.to_string().red().bold(),
+                if changes.stats.deletions == 1 {
+                    "deletion(-)"
+                } else {
+                    "deletions(-)"
+                }
+            );
+
             // Print file changes summary
             if !changes.added.is_empty() {
                 println!("\n{} {}", SPARKLE, style("Added files:").cyan().bold());
@@ -293,25 +567,26 @@ async fn main() -> anyhow::Result<()> {
                     println!("  {} {}", "+".green().bold(), style(file).green());
                 }
             }
-            
+
             if !changes.modified.is_empty() {
                 println!("\n{} {}", SPARKLE, style("Modified files:").cyan().bold());
                 for file in changes.modified {
                     println!("  {} {}", "*".yellow().bold(), style(file).yellow());
                 }
             }
-            
+
             if !changes.deleted.is_empty() {
                 println!("\n{} {}", SPARKLE, style("Deleted files:").cyan().bold());
                 for file in changes.deleted {
                     println!("  {} {}", "-".red().bold(), style(file).red());
                 }
             }
-            
+
             if !changes.renamed.is_empty() {
                 println!("\n{} {}", SPARKLE, style("Renamed files:").cyan().bold());
                 for (old, new) in changes.renamed {
-                    println!("  {} {} {} {}", 
+                    println!(
+                        "  {} {} {} {}",
                         "→".blue().bold(),
                         style(old).strikethrough(),
                         "→".blue().bold(),
@@ -321,7 +596,11 @@ async fn main() -> anyhow::Result<()> {
             }
 
             // Print detailed diff
-            println!("\n{} {}", SPARKLE, style("Detailed changes:").cyan().bold().underlined());
+            println!(
+                "\n{} {}",
+                SPARKLE,
+                style("Detailed changes:").cyan().bold().underlined()
+            );
             let hunks = repo.get_structured_diff()?;
             for hunk in hunks {
                 println!("\n{}", style(hunk.header).cyan());
@@ -334,6 +613,29 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        Commands::Branch { command } => match command {
+            cli::BranchCommands::Health {
+                all,
+                remote,
+                local: _,
+                days,
+                author,
+                format,
+            } => {
+                let analyzer = BranchAnalyzer::new(".")?;
+                let filter = if all {
+                    BranchFilter::All
+                } else if remote {
+                    BranchFilter::Remote
+                } else {
+                    BranchFilter::Local
+                };
+
+                let results = analyzer.analyze_branches(filter, days, author)?;
+                let output = format_output(&results, format.as_str().into())?;
+                println!("{}", output);
+            }
+        },
     }
 
     Ok(())
