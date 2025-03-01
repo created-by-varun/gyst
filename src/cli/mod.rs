@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "gyst")]
 #[command(author = "Varun V")]
-#[command(version = "0.1.1")]
+#[command(version = "0.1.2")]
 #[command(about = "AI-powered Git assistant for commits, branch management, and more")]
 pub struct Cli {
     #[command(subcommand)]
