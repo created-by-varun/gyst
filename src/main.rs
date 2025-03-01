@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Commit { quick } => {
+        Commands::Commit { quick, push } => {
             let repo = git::GitRepo::open(".")?;
 
             // Check if there are any changes at all
@@ -196,6 +196,17 @@ async fn main() -> anyhow::Result<()> {
                     style("Final Commit Message:").cyan().bold(),
                     message
                 );
+            }
+
+            if push {
+                let mut sp = Spinner::new(Spinners::Dots9, "Pushing changes...".into());
+                repo.push_changes()?;
+                sp.stop_with_message(format!(
+                    "{} {} {}\n",
+                    CHECKMARK,
+                    style("Changes pushed successfully!").green().bold(),
+                    SPARKLE
+                ));
             }
         }
         Commands::Suggest => {

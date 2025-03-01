@@ -17,10 +17,15 @@ pub enum Commands {
     /// Analyzes your staged changes and generates a meaningful commit message.
     /// In interactive mode (default), you can review, edit, or reject the message.
     /// Use --quick to skip confirmation and use the message directly.
+    #[command(alias = "c")]
     Commit {
         /// Skip confirmation and use the generated message directly
         #[arg(short, long)]
         quick: bool,
+
+        /// Push changes after committing
+        #[arg(short, long)]
+        push: bool,
     },
 
     /// Get multiple commit message suggestions

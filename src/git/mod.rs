@@ -292,4 +292,25 @@ impl GitRepo {
             .ok_or_else(|| anyhow::anyhow!("Failed to get branch name"))?;
         Ok(branch_name.to_string())
     }
+
+    /// Push the current branch to the remote repository
+    pub fn push_changes(&self) -> Result<()> {
+        // Get the current branch name
+        let branch_name = self.get_current_branch()?;
+        
+        // Execute git push using std::process::Command
+        // This is simpler than using libgit2 for pushing
+        let status = std::process::Command::new("git")
+            .arg("push")
+            .arg("origin")
+            .arg(&branch_name)
+            .status()
+            .context("Failed to execute git push command")?;
+            
+        if !status.success() {
+            return Err(anyhow::anyhow!("Failed to push changes to remote repository"));
+        }
+        
+        Ok(())
+    }
 }
