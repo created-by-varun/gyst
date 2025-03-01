@@ -6,9 +6,9 @@ Version: 0.2.0
 
 Gyst's new branch management features aim to help developers maintain a cleaner repository and better understand branch health. This proposal covers two primary commands: `branch health` and `branch clean`.
 
-## 1. Branch Health Analysis
+## 1. Branch Health Analysis (DONE)
 
-Command: `gyst branch health`
+Command: `gyst branch health` (DONE)
 
 ### Purpose
 
@@ -75,7 +75,7 @@ bugfix/login-error
 └── Main Distance: 8 ahead, 15 behind
 ```
 
-## 2. Branch Cleanup
+## 2. Branch Cleanup (TODO)
 
 Command: `gyst branch clean`
 

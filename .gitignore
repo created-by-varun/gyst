@@ -1,4 +1,8 @@
 /target
+/server/target
+
+/server/.env
+/server/.env*
 
 # Release artifacts
 gyst-darwin-*

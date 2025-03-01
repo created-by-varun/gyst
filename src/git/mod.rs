@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
-use git2::{Repository, StatusOptions, Delta};
+use git2::{Delta, Repository, StatusOptions};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StagedChanges {
     pub added: Vec<String>,
     pub modified: Vec<String>,
@@ -11,7 +12,7 @@ pub struct StagedChanges {
     pub stats: DiffStats,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct DiffStats {
     pub files_changed: usize,
     pub insertions: usize,
@@ -42,25 +43,20 @@ pub struct GitRepo {
 impl GitRepo {
     /// Open a git repository at the given path or search parent directories
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let repo = Repository::discover(path)
-            .context("Failed to find git repository")?;
+        let repo = Repository::discover(path).context("Failed to find git repository")?;
         Ok(Self { repo })
     }
 
     /// Stage all changes in the repository
     pub fn stage_all(&self) -> Result<()> {
         let mut index = self.repo.index()?;
-        
+
         // Add all changes to the index
-        index.add_all(
-            ["*"].iter(),
-            git2::IndexAddOption::DEFAULT,
-            None,
-        )?;
-        
+        index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
+
         // Write the index to disk
         index.write()?;
-        
+
         Ok(())
     }
 
@@ -72,16 +68,17 @@ impl GitRepo {
             .include_unmodified(false)
             .exclude_submodules(true);
 
-        let statuses = self.repo
+        let statuses = self
+            .repo
             .statuses(Some(&mut opts))
             .context("Failed to get repository status")?;
 
         Ok(statuses.iter().any(|entry| {
             let status = entry.status();
-            status.is_index_new() 
-                || status.is_index_modified() 
-                || status.is_index_deleted() 
-                || status.is_index_renamed() 
+            status.is_index_new()
+                || status.is_index_modified()
+                || status.is_index_deleted()
+                || status.is_index_renamed()
                 || status.is_index_typechange()
         }))
     }
@@ -94,7 +91,8 @@ impl GitRepo {
             .include_unmodified(false)
             .exclude_submodules(true);
 
-        let statuses = self.repo
+        let statuses = self
+            .repo
             .statuses(Some(&mut opts))
             .context("Failed to get repository status")?;
 
@@ -117,7 +115,8 @@ impl GitRepo {
             .include_unmodified(false)
             .exclude_submodules(true);
 
-        let statuses = self.repo
+        let statuses = self
+            .repo
             .statuses(Some(&mut opts))
             .context("Failed to get repository status")?;
 
@@ -136,10 +135,14 @@ impl GitRepo {
                 changes.stats.files_changed += 1;
             } else if status.is_index_renamed() {
                 if let Some(head_to_index) = entry.head_to_index() {
-                    let old_path = head_to_index.old_file().path()
+                    let old_path = head_to_index
+                        .old_file()
+                        .path()
                         .map(|p| p.to_string_lossy().to_string())
                         .unwrap_or_else(|| "unknown".to_string());
-                    let new_path = head_to_index.new_file().path()
+                    let new_path = head_to_index
+                        .new_file()
+                        .path()
                         .map(|p| p.to_string_lossy().to_string())
                         .unwrap_or_else(|| "unknown".to_string());
                     changes.renamed.push((old_path, new_path));
@@ -161,19 +164,22 @@ impl GitRepo {
     /// Get the raw diff object for staged changes
     fn get_diff(&self) -> Result<git2::Diff> {
         let mut diff_opts = git2::DiffOptions::new();
-        
+
         // Get the current index (staged changes)
         let index = self.repo.index()?;
-        
+
         // Get the diff between HEAD and index (staged changes)
         if let Ok(head) = self.repo.head() {
             let tree = head.peel_to_tree()?;
-            self.repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut diff_opts))
+            self.repo
+                .diff_tree_to_index(Some(&tree), Some(&index), Some(&mut diff_opts))
         } else {
             // If there's no HEAD (initial commit), diff against an empty tree
             let empty_tree = self.repo.find_tree(git2::Oid::zero())?;
-            self.repo.diff_tree_to_index(Some(&empty_tree), Some(&index), Some(&mut diff_opts))
-        }.context("Failed to generate diff")
+            self.repo
+                .diff_tree_to_index(Some(&empty_tree), Some(&index), Some(&mut diff_opts))
+        }
+        .context("Failed to generate diff")
     }
 
     /// Get structured diff information
@@ -194,7 +200,7 @@ impl GitRepo {
                         lines: Vec::new(),
                     });
                 }
-                
+
                 if let Some(hunk) = &mut current_hunk {
                     let origin = line.origin();
                     let content = String::from_utf8_lossy(line.content()).to_string();
@@ -218,14 +224,17 @@ impl GitRepo {
 
     /// Create a commit with the given message
     pub fn create_commit(&self, message: &str) -> Result<git2::Oid> {
-        let signature = self.repo.signature()
-            .context("Failed to get signature")?;
-        
-        let tree_id = self.repo.index()?
+        let signature = self.repo.signature().context("Failed to get signature")?;
+
+        let tree_id = self
+            .repo
+            .index()?
             .write_tree()
             .context("Failed to write tree")?;
-        
-        let tree = self.repo.find_tree(tree_id)
+
+        let tree = self
+            .repo
+            .find_tree(tree_id)
             .context("Failed to find tree")?;
 
         let parent = match self.repo.head() {
@@ -238,20 +247,24 @@ impl GitRepo {
             None => vec![],
         };
 
-        self.repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            message,
-            &tree,
-            &parents,
-        ).context("Failed to create commit")
+        self.repo
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                message,
+                &tree,
+                &parents,
+            )
+            .context("Failed to create commit")
     }
 
     /// Get a list of all local branches in the repository
     #[allow(dead_code)]
     pub fn get_local_branches(&self) -> Result<Vec<git2::Branch>> {
-        let branches = self.repo.branches(Some(git2::BranchType::Local))?
+        let branches = self
+            .repo
+            .branches(Some(git2::BranchType::Local))?
             .filter_map(|b| b.ok())
             .map(|(branch, _)| branch)
             .collect();
@@ -261,7 +274,9 @@ impl GitRepo {
     /// Get a list of all remote branches in the repository
     #[allow(dead_code)]
     pub fn get_remote_branches(&self) -> Result<Vec<git2::Branch>> {
-        let branches = self.repo.branches(Some(git2::BranchType::Remote))?
+        let branches = self
+            .repo
+            .branches(Some(git2::BranchType::Remote))?
             .filter_map(|b| b.ok())
             .map(|(branch, _)| branch)
             .collect();
@@ -272,7 +287,8 @@ impl GitRepo {
     #[allow(dead_code)]
     pub fn get_current_branch(&self) -> Result<String> {
         let head = self.repo.head()?;
-        let branch_name = head.shorthand()
+        let branch_name = head
+            .shorthand()
             .ok_or_else(|| anyhow::anyhow!("Failed to get branch name"))?;
         Ok(branch_name.to_string())
     }
