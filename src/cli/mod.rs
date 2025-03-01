@@ -4,7 +4,9 @@ use clap::{Parser, Subcommand};
 #[command(name = "gyst")]
 #[command(author = "Varun V")]
 #[command(version = "0.1.2")]
-#[command(about = "AI-powered Git assistant for commits, branch management, and more")]
+#[command(
+    about = "AI-powered Git assistant for commits, branch management, and more. Visit https://gyst-cli.vercel.app for more information."
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -46,8 +48,14 @@ pub enum Commands {
 
     /// Configure gyst settings
     ///
-    /// Manage configuration settings including API keys and preferences.
-    /// Use --show to view current settings, --api-key to set API key.
+    /// Manage configuration settings including API keys and server preferences.
+    /// By default, gyst uses server mode which doesn't require an API key.
+    ///
+    /// Server mode: Uses the gyst cloud service for AI operations (default)
+    /// Direct API mode: Uses your API key directly (requires --api-key)
+    ///
+    /// Use --show to view current settings, --api-key to set API key,
+    /// --use-server to toggle between server and direct API modes.
     Config {
         /// Set the OpenAI API key
         #[arg(long)]
@@ -57,7 +65,9 @@ pub enum Commands {
         #[arg(short, long)]
         show: bool,
 
-        /// Enable or disable using the server
+        /// Enable or disable server mode (default: true)
+        /// When enabled, uses gyst cloud service for AI operations (no API key needed)
+        /// When disabled, uses your API key directly with the Anthropic API
         #[arg(long)]
         use_server: Option<bool>,
     },

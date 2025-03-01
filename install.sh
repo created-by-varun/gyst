@@ -81,7 +81,6 @@ rm -rf "$TMP_DIR"
 if command -v gyst >/dev/null; then
     success "✨ gyst has been installed successfully!"
     info "💡 Run 'gyst --help' to get started"
-    info "🔑 Configure your API key with: gyst config --api-key YOUR_API_KEY"
 else
     error "❌ Installation failed. Please try again or report the issue."
 fi
